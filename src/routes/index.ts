@@ -100,20 +100,34 @@ export const miscRoutes = (
         app.route("/metrics", metrics);
     }
 
-    app.get("/api/set/proxy/:proxy", async (c) => {
-        let proxy = c.req.param("proxy");
-        if (proxy) {
-            proxy = decodeURIComponent(proxy);
-            config.networking.proxy = proxy;
-            console.log(`[INFO] Proxy updated to: ${proxy}`);
-
-            if (regenerateSession) {
-                console.log("[INFO] Triggering session regeneration...");
-                await regenerateSession();
+    app.use(
+        "/api/*",
+        async (c, next) => {
+            if (config.rate_limit.enabled) {
+                return await rateLimiter(c, next);
             }
+            await next();
+        },
+    );
 
-            return c.text(`Proxy updated to: ${proxy}`);
-        }
-        return c.text("Invalid proxy", 400);
-    });
+    app.get(
+        "/api/set/proxy/:proxy",
+        bearerAuth({ token: config.server.secret_key }),
+        async (c) => {
+            let proxy = c.req.param("proxy");
+            if (proxy) {
+                proxy = decodeURIComponent(proxy);
+                config.networking.proxy = proxy;
+                console.log(`[INFO] Proxy updated to: ${proxy}`);
+
+                if (regenerateSession) {
+                    console.log("[INFO] Triggering session regeneration...");
+                    await regenerateSession();
+                }
+
+                return c.text(`Proxy updated to: ${proxy}`);
+            }
+            return c.text("Invalid proxy", 400);
+        },
+    );
 };
