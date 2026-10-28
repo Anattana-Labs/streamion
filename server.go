@@ -35,13 +35,24 @@ func transfer(destination io.WriteCloser, source io.ReadCloser) {
 	io.Copy(destination, source)
 }
 
-func startWireGuard(cfg params) error {
+func startWireGuard(cfg *params) error {
 	if cfg.WgPrivateKey == "" || cfg.WgPeerEndpoint == "" {
-		log.Println("[INFO] WireGuard config missing, running in DIRECT mode (no VPN)")
-		return nil
+		log.Println("[INFO] WireGuard config missing. Auto-generating Cloudflare WARP configuration...")
+		warpCfg, err := RegisterWarp()
+		if err != nil {
+			return fmt.Errorf("auto WARP registration failed: %w", err)
+		}
+		cfg.WgPrivateKey = warpCfg.PrivateKey
+		cfg.WgAddress = warpCfg.Address
+		cfg.WgPeerPublicKey = warpCfg.PeerPublicKey
+		cfg.WgPeerEndpoint = warpCfg.PeerEndpoint
+		if cfg.WgDNS == "" {
+			cfg.WgDNS = warpCfg.DNS
+		}
+		log.Printf("[SUCCESS] WARP registered. Local IP: %s, Peer: %s", cfg.WgAddress, cfg.WgPeerEndpoint)
 	}
 
-	log.Println("[INFO] Initializing Userspace WireGuard...")
+	log.Println("[INFO] Initializing Userspace WireGuard with Cloudflare WARP...")
 
 	localIPs := []netip.Addr{}
 	if cfg.WgAddress != "" {
@@ -113,7 +124,7 @@ func main() {
 		log.Printf("[WARN] Config parse warning: %+v\n", err)
 	}
 
-	if err := startWireGuard(cfg); err != nil {
+	if err := startWireGuard(&cfg); err != nil {
 		log.Fatalf("[FATAL] Failed to start WireGuard: %v", err)
 	}
 

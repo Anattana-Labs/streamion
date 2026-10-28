@@ -29,12 +29,12 @@
 # # you need to change the --allow-write from deno run too
 # directory = "/var/tmp" # env variable: CACHE_DIRECTORY
  
+# [rate_limit]
+# enabled = true # env variable: RATE_LIMIT_ENABLED
+
 # [networking]
 ## Proxy type supported: https://docs.deno.com/api/deno/~/Deno.Proxy
-# #proxy = "" # env variable: PROXY
-# # Enable automatic proxy fetching from antpeak.com (free proxies, auto-rotates when failed)
-# # When enabled, ignores the `proxy` setting above and fetches proxies automatically
-# auto_proxy = false # env variable: NETWORKING_AUTO_PROXY
+# proxy = "socks5://127.0.0.1:1080" # env variable: PROXY (e.g. Cloudflare WARP proxy)
 # # IPv6 rotation settings - allows sending requests with unique IPv6 addresses
 # # This requires IPv6 setup: https://github.com/iv-org/invidious-companion/wiki/How-to-send-IPv6-requests-with-a-new-IPv6-address-for-each-request-on-a-server-with-a-whole-IPv6-range
 # # Randomizes all bits after the block prefix (e.g., /32 randomizes bits 33-128)
@@ -78,3 +78,8 @@
 # [youtube_session]
 # oauth_enabled = false # env variable: YOUTUBE_SESSION_OAUTH_ENABLED
 # cookies = "" # env variable: YOUTUBE_SESSION_COOKIES
+
+# Ability to disable captions in case you are getting blocked too
+# aggressively by YouTube.
+# [captions]
+# enabled = true # env variable: CAPTIONS_ENABLED

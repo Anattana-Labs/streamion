@@ -67,12 +67,6 @@ export const ConfigSchema = z.object({
     }).strict().default({}),
     networking: z.object({
         proxy: z.string().nullable().default(Deno.env.get("PROXY") || null),
-        auto_proxy: z.boolean().default(
-            Deno.env.get("NETWORKING_AUTO_PROXY") === "true" || false,
-        ),
-        vpn_source: z.number().default(
-            Number(Deno.env.get("NETWORKING_VPN_SOURCE")) || 1,
-        ),
         ipv6_block: z.string().nullable().default(
             Deno.env.get("NETWORKING_IPV6_BLOCK") || null,
         ),
@@ -83,7 +77,7 @@ export const ConfigSchema = z.object({
             retry: z.object({
                 enabled: z.boolean().default(
                     Deno.env.get("NETWORKING_FETCH_RETRY_ENABLED") === "true" ||
-                    false,
+                        false,
                 ),
                 times: z.number().optional().default(
                     Number(Deno.env.get("NETWORKING_FETCH_RETRY_TIMES")) || 1,
@@ -105,7 +99,7 @@ export const ConfigSchema = z.object({
         videoplayback: z.object({
             ump: z.boolean().default(
                 Deno.env.get("NETWORKING_VIDEOPLAYBACK_UMP") === "true" ||
-                false,
+                    false,
             ),
             video_fetch_chunk_size_mb: z.number().default(
                 Number(
@@ -120,7 +114,7 @@ export const ConfigSchema = z.object({
         youtube_session: z.object({
             po_token_enabled: z.boolean().default(
                 Deno.env.get("JOBS_YOUTUBE_SESSION_PO_TOKEN_ENABLED") ===
-                    "false"
+                        "false"
                     ? false
                     : true,
             ),
@@ -135,6 +129,11 @@ export const ConfigSchema = z.object({
         ),
         cookies: z.string().default(
             Deno.env.get("YOUTUBE_SESSION_COOKIES") || "",
+        ),
+    }).strict().default({}),
+    captions: z.object({
+        enabled: z.boolean().default(
+            Deno.env.get("CAPTIONS_ENABLED") === "false" ? false : true,
         ),
     }).strict().default({}),
 }).strict();

@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { encodeRFC5987ValueChars } from "../lib/helpers/encodeRFC5987ValueChars.ts";
 import { decryptQuery } from "../lib/helpers/encryptQuery.ts";
-import { StreamingApi } from "hono/utils/stream";
 
 let getFetchClientLocation = "getFetchClient";
 if (Deno.env.get("GET_FETCH_CLIENT_LOCATION")) {
@@ -32,7 +31,7 @@ videoPlaybackProxy.options("/", () => {
 });
 
 videoPlaybackProxy.get("/", async (c) => {
-    const { c: client, expire, title } = c.req.query();
+    const { host, c: client, expire, title } = c.req.query();
     const urlReq = new URL(c.req.url);
     const config = c.get("config");
     const queryParams = new URLSearchParams(urlReq.search);
@@ -49,7 +48,11 @@ videoPlaybackProxy.get("/", async (c) => {
         queryParams.set("ip", parsedDecryptedQueryParams.get("ip") as string);
     }
 
-
+    if (host == undefined || !/[\w-]+.googlevideo.com/.test(host)) {
+        throw new HTTPException(400, {
+            res: new Response("Host query string do not match or undefined."),
+        });
+    }
 
     if (
         expire == undefined ||
@@ -68,7 +71,7 @@ videoPlaybackProxy.get("/", async (c) => {
         });
     }
 
-
+    queryParams.delete("host");
     queryParams.delete("title");
 
     const rangeHeader = c.req.header("range");
@@ -103,7 +106,7 @@ videoPlaybackProxy.get("/", async (c) => {
     const fetchClient = await getFetchClient(config);
 
     let headResponse: Response | undefined;
-    let location = `https://redirector.googlevideo.com/videoplayback?${queryParams.toString()}`;
+    let location = `https://${host}/videoplayback?${queryParams.toString()}`;
 
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-p2-semantics-17#section-7.3
     // A maximum of 5 redirections is defined in the note of the section 7.3
@@ -136,58 +139,15 @@ videoPlaybackProxy.get("/", async (c) => {
         });
     }
 
-    // =================== REQUEST CHUNKING =======================
-    // if the requested response is larger than the chunkSize, break up the response
-    // into chunks and stream the response back to the client to avoid rate limiting
-    const { readable, writable } = new TransformStream();
-    const stream = new StreamingApi(writable, readable);
     const googleVideoUrl = new URL(location);
-    const getChunk = async (start: number, end: number) => {
-        googleVideoUrl.searchParams.set(
-            "range",
-            `${start}-${end}`,
-        );
-        const postResponse = await fetchClient(googleVideoUrl, {
-            method: "POST",
-            body: new Uint8Array([0x78, 0]), // protobuf: { 15: 0 } (no idea what it means but this is what YouTube uses),
-            headers: headersToSend,
-        });
-        if (postResponse.status !== 200) {
-            throw new Error("Non-200 response from google servers");
-        }
-        await stream.pipe(postResponse.body);
-    };
-
-    const chunkSize =
-        config.networking.videoplayback.video_fetch_chunk_size_mb * 1_000_000;
-    const totalBytes = Number(
-        headResponse.headers.get("Content-Length") || "0",
-    );
-
-    // if no range sent, the client wants thw whole file, i.e. for downloads
-    const wholeRequestStartByte = Number(firstByte || "0");
-    const wholeRequestEndByte = wholeRequestStartByte + Number(totalBytes) - 1;
-
-    let chunk = Promise.resolve();
-    for (
-        let startByte = wholeRequestStartByte;
-        startByte < wholeRequestEndByte;
-        startByte += chunkSize
-    ) {
-        // i.e.
-        // 0 - 4_999_999, then
-        // 5_000_000 - 9_999_999, then
-        // 10_000_000 - 14_999_999
-        let endByte = startByte + chunkSize - 1;
-        if (endByte > wholeRequestEndByte) {
-            endByte = wholeRequestEndByte;
-        }
-        chunk = chunk.then(() => getChunk(startByte, endByte));
-    }
-    chunk.catch(() => {
-        stream.abort();
+    const postResponse = await fetchClient(googleVideoUrl, {
+        method: "POST",
+        body: new Uint8Array([0x78, 0]), // protobuf: { 15: 0 } (no idea what it means but this is what YouTube uses),
+        headers: headersToSend,
     });
-    // =================== REQUEST CHUNKING =======================
+    if (postResponse.status !== 200) {
+        throw new Error("Non-200 response from google servers");
+    }
 
     const headersForResponse: Record<string, string> = {
         "content-length": headResponse.headers.get("content-length") || "",
@@ -199,8 +159,9 @@ videoPlaybackProxy.get("/", async (c) => {
     };
 
     if (title) {
-        headersForResponse["content-disposition"] = `attachment; filename="${encodeURIComponent(title)
-            }"; filename*=UTF-8''${encodeRFC5987ValueChars(title)}`;
+        headersForResponse["content-disposition"] = `attachment; filename="${
+            encodeURIComponent(title)
+        }"; filename*=UTF-8''${encodeRFC5987ValueChars(title)}`;
     }
 
     let responseStatus = headResponse.status;
@@ -211,8 +172,9 @@ videoPlaybackProxy.get("/", async (c) => {
         // "bytes=500-1000" get 500 bytes starting from 500
         if (lastByte) {
             responseStatus = 206;
-            headersForResponse["content-range"] = `bytes ${requestBytes}/${queryParams.get("clen") || "*"
-                }`;
+            headersForResponse["content-range"] = `bytes ${requestBytes}/${
+                queryParams.get("clen") || "*"
+            }`;
         } else {
             // i.e. "bytes=0-", "bytes=600-"
             // full size of content is able to be calculated, so a full Content-Range header can be constructed
@@ -230,7 +192,7 @@ videoPlaybackProxy.get("/", async (c) => {
         }
     }
 
-    return new Response(stream.responseReadable, {
+    return new Response(postResponse.body, {
         status: responseStatus,
         statusText: headResponse.statusText,
         headers: headersForResponse,

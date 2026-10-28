@@ -1,14 +1,13 @@
 import { Hono } from "hono";
-import type { HonoVariables } from "../../lib/types/HonoVariables.ts";
+import { HTTPException } from "hono/http-exception";
+import type { CaptionTrackData } from "youtubei.js/PlayerCaptionsTracklist";
+import { validateVideoId } from "../../lib/helpers/validateVideoId.ts";
 import { verifyRequest } from "../../lib/helpers/verifyRequest.ts";
 import {
     youtubePlayerParsing,
     youtubeVideoInfo,
 } from "../../lib/helpers/youtubePlayerHandling.ts";
-import type { CaptionTrackData } from "youtubei.js/PlayerCaptionsTracklist";
 import { handleTranscripts } from "../../lib/helpers/youtubeTranscriptsHandling.ts";
-import { HTTPException } from "hono/http-exception";
-import { validateVideoId } from "../../lib/helpers/validateVideoId.ts";
 import { TOKEN_MINTER_NOT_READY_MESSAGE } from "../../constants.ts";
 
 interface AvailableCaption {
@@ -17,18 +16,25 @@ interface AvailableCaption {
     url: string;
 }
 
-const captionsHandler = new Hono<{ Variables: HonoVariables }>();
+const captionsHandler = new Hono();
+
 captionsHandler.get("/:videoId", async (c) => {
-    const { videoId } = c.req.param();
+    const videoId = c.req.param("videoId");
+    const check = c.req.query("check");
     const config = c.get("config");
     const metrics = c.get("metrics");
     const tokenMinter = c.get("tokenMinter");
 
-    const check = c.req.query("check");
-
-    if (!validateVideoId(videoId)) {
+    if (validateVideoId(videoId) === false) {
         throw new HTTPException(400, {
             res: new Response("Invalid video ID format."),
+        });
+    }
+
+    // fail early if captions are disabled
+    if (!config.captions?.enabled) {
+        throw new HTTPException(503, {
+            res: new Response("Captions are disabled by administrator."),
         });
     }
 
@@ -90,24 +96,37 @@ captionsHandler.get("/:videoId", async (c) => {
     }
 
     // Extract selected caption
-    let filterSelected: CaptionTrackData[];
+    let match: CaptionTrackData | undefined;
 
     if (lang) {
-        filterSelected = captionsTrackArray.filter((c: CaptionTrackData) =>
+        match = captionsTrackArray.find((c: CaptionTrackData) =>
             c.language_code === lang
         );
     } else {
-        filterSelected = captionsTrackArray.filter((c: CaptionTrackData) =>
+        match = captionsTrackArray.find((c: CaptionTrackData) =>
             c.name.text === label
         );
     }
 
-    if (filterSelected.length == 0) throw new HTTPException(404);
+    if (match == undefined) throw new HTTPException(404);
+
+    let poToken: string | undefined;
+    let clientName: string | undefined;
+    if (tokenMinter) {
+        poToken = await tokenMinter(videoId);
+        clientName = innertubeClient.session.context.client.clientName;
+    }
 
     c.header("Content-Type", "text/vtt; charset=UTF-8");
     c.header("Access-Control-Allow-Origin", "*");
     return c.body(
-        await handleTranscripts(innertubeClient, videoId, filterSelected[0]),
+        await handleTranscripts(
+            innertubeClient,
+            videoId,
+            match,
+            poToken,
+            clientName,
+        ),
     );
 });
 

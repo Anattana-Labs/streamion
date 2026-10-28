@@ -13,22 +13,6 @@ const config = await parseConfig();
 import { Metrics } from "./lib/helpers/metrics.ts";
 import { PLAYER_ID } from "./constants.ts";
 import { jsInterpreter } from "./lib/helpers/jsInterpreter.ts";
-import {
-    initProxyManager,
-    markProxyFailed,
-    isProxyManagerReady,
-} from "./lib/helpers/proxyManager.ts";
-
-// Initialize auto proxy manager if enabled
-if (config.networking.auto_proxy) {
-    console.log("[INFO] Auto proxy is enabled, initializing proxy manager...");
-    try {
-        await initProxyManager(config.networking.vpn_source);
-    } catch (err) {
-        console.error("[ERROR] Failed to initialize proxy manager:", err);
-        console.log("[WARN] Continuing without auto proxy...");
-    }
-}
 
 const args = parseArgs(Deno.args);
 
@@ -52,7 +36,7 @@ if (Deno.env.get("GET_FETCH_CLIENT_LOCATION")) {
 const { getFetchClient } = await import(getFetchClientLocation);
 
 declare module "hono" {
-    interface ContextVariableMap extends HonoVariables { }
+    interface ContextVariableMap extends HonoVariables {}
 }
 
 const app = new Hono({
@@ -103,24 +87,12 @@ if (!innertubeClientOauthEnabled) {
         // Initialize tokenMinter in background to not block server startup
         console.log("[INFO] Starting PO token generation in background...");
 
-        // Wrapper function that rotates proxy on failure when auto_proxy is enabled
-        const poTokenGenerateWithProxyRotation = async () => {
-            try {
-                return await poTokenGenerate(config, metrics);
-            } catch (err) {
-                // If auto_proxy is enabled and PO token generation failed, rotate to a new proxy
-                if (config.networking.auto_proxy) {
-                    console.log(
-                        "[INFO] PO token generation failed, rotating to new proxy...",
-                    );
-                    await markProxyFailed();
-                }
-                throw err; // Re-throw to trigger retry
-            }
-        };
-
         retry(
-            poTokenGenerateWithProxyRotation,
+            poTokenGenerate.bind(
+                poTokenGenerate,
+                config,
+                metrics,
+            ),
             { minTimeout: 1_000, maxTimeout: 60_000, multiplier: 5, jitter: 0 },
         ).then((result) => {
             innertubeClient = result.innertubeClient;
@@ -135,8 +107,6 @@ if (!innertubeClientOauthEnabled) {
         // If PO token is not enabled, resolve immediately
         tokenMinterReadyResolve?.();
     }
-    // Resolve promise for tests
-    tokenMinterReadyResolve?.();
 }
 
 const regenerateSession = async () => {
@@ -148,14 +118,6 @@ const regenerateSession = async () => {
             ));
         } catch (err) {
             metrics?.potokenGenerationFailure.inc();
-            // If auto_proxy is enabled and PO token generation failed, rotate to a new proxy
-            if (config.networking.auto_proxy) {
-                console.log(
-                    "[INFO] Session regeneration failed, rotating to new proxy...",
-                );
-                await markProxyFailed();
-            }
-            // Don't rethrow for cron/manual trigger to avoid crashing the server loop
             console.error("[ERROR] Failed to regenerate session:", err);
         }
     } else {
@@ -250,11 +212,13 @@ if (import.meta.main) {
     const { signal } = controller;
     run(signal, config.server.port, config.server.host);
 
-    Deno.addSignalListener("SIGTERM", () => {
-        console.log("Caught SIGINT, shutting down...");
-        controller.abort();
-        Deno.exit(0);
-    });
+    if (Deno.build.os !== "windows") {
+        Deno.addSignalListener("SIGTERM", () => {
+            console.log("Caught SIGINT, shutting down...");
+            controller.abort();
+            Deno.exit(0);
+        });
+    }
 
     Deno.addSignalListener("SIGINT", () => {
         console.log("Caught SIGINT, shutting down...");

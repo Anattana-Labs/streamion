@@ -25,18 +25,8 @@ enabled = true                    # env: CACHE_ENABLED
 enabled = true                   # env: RATE_LIMIT_ENABLED
 
 [networking]
-# Auto Proxy Settings
-# auto_proxy: enable automatic proxy fetching (rotates on failure)
-auto_proxy = true            # env: NETWORKING_AUTO_PROXY
-
-# VPN Source: Which service to use for auto_proxy
-# 1 = AntPeak (Default)
-# 2 = Urban VPN
-# 3 = Custom Proxy API (self hosted)
-vpn_source = 2                    # env: NETWORKING_VPN_SOURCE
-
-# Manual Proxy (overrides auto_proxy if set)
-#proxy = "socks5://127.0.0.1:1080"
+# Cloudflare WARP SOCKS5 Proxy
+proxy = "socks5://127.0.0.1:1080"   # env: PROXY
 
 # IPv6 Rotation
 # ipv6_block = "2001:db8::/32"     # env: NETWORKING_IPV6_BLOCK
@@ -61,3 +51,6 @@ frequency = "*/5 * * * *"          # env: JOBS_YOUTUBE_SESSION_FREQUENCY
 [youtube_session]
 # oauth_enabled = true             # env: YOUTUBE_SESSION_OAUTH_ENABLED
 # cookies = ""                     # env: YOUTUBE_SESSION_COOKIES
+
+[captions]
+enabled = true                     # env: CAPTIONS_ENABLED

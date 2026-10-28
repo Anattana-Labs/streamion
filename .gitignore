@@ -1,0 +1,19 @@
+# Root Binaries
+/server
+/warp
+/invidious_companion
+
+# Upstream submodule / reference clone
+invidious-companion/
+
+# Environment and secrets
+.env
+*.local
+
+# Deno / Node
+.cache/
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

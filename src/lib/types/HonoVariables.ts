@@ -9,3 +9,7 @@ export type HonoVariables = {
     tokenMinter: TokenMinter | undefined;
     metrics: Metrics | undefined;
 };
+
+declare module "hono" {
+    interface ContextVariableMap extends HonoVariables {}
+}
