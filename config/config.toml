@@ -22,7 +22,7 @@ enabled = true                    # env: CACHE_ENABLED
 # directory = "/var/tmp"           # env: CACHE_DIRECTORY
 
 [rate_limit]
-enabled = true                   # env: RATE_LIMIT_ENABLED
+enabled = false                   # env: RATE_LIMIT_ENABLED
 
 [networking]
 # Cloudflare WARP SOCKS5 Proxy

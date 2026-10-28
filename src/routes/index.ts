@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { bearerAuth } from "hono/bearer-auth";
 import { cache } from "hono/cache";
+import { cors } from "hono/cors";
 import { rateLimiter } from "../lib/middlewares/rateLimiter.ts";
 
 import youtubeApiPlayer from "./youtube_api_routes/player.ts";
@@ -34,6 +35,8 @@ export const companionRoutes = (
     } else {
         app.use("*", logger());
     }
+
+    app.use("*", cors());
 
     app.use(
         "*",

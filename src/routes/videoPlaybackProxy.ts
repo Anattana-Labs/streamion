@@ -48,11 +48,13 @@ videoPlaybackProxy.get("/", async (c) => {
         queryParams.set("ip", parsedDecryptedQueryParams.get("ip") as string);
     }
 
-    let cleanHost = (host || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
-    if (!cleanHost || !/[\w-]+.googlevideo.com/.test(cleanHost)) {
-        throw new HTTPException(400, {
-            res: new Response("Host query string do not match or undefined. Expected format: rr---.googlevideo.com"),
-        });
+    // Extract or auto-resolve host via Google Video redirector
+    let cleanHost = "redirector.googlevideo.com";
+    if (host) {
+        const sanitized = host.trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+        if (/[\w-]+\.googlevideo\.com/.test(sanitized)) {
+            cleanHost = sanitized;
+        }
     }
 
     if (
@@ -66,11 +68,7 @@ videoPlaybackProxy.get("/", async (c) => {
         });
     }
 
-    if (client == undefined) {
-        throw new HTTPException(400, {
-            res: new Response("'c' query string undefined."),
-        });
-    }
+    const effectiveClient = client || queryParams.get("c") || "WEB";
 
     queryParams.delete("host");
     queryParams.delete("title");
@@ -93,10 +91,10 @@ videoPlaybackProxy.get("/", async (c) => {
         "referer": "https://www.youtube.com",
     };
 
-    if (client == "ANDROID") {
+    if (effectiveClient == "ANDROID") {
         headersToSend["user-agent"] =
             "com.google.android.youtube/1537338816 (Linux; U; Android 13; en_US; ; Build/TQ2A.230505.002; Cronet/113.0.5672.24)";
-    } else if (client == "IOS") {
+    } else if (effectiveClient == "IOS") {
         headersToSend["user-agent"] =
             "com.google.ios.youtube/19.32.8 (iPhone14,5; U; CPU iOS 17_6 like Mac OS X;)";
     } else {
