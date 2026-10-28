@@ -48,9 +48,10 @@ videoPlaybackProxy.get("/", async (c) => {
         queryParams.set("ip", parsedDecryptedQueryParams.get("ip") as string);
     }
 
-    if (host == undefined || !/[\w-]+.googlevideo.com/.test(host)) {
+    let cleanHost = (host || "").trim().replace(/^https?:\/\//i, "").replace(/\/.*$/, "");
+    if (!cleanHost || !/[\w-]+.googlevideo.com/.test(cleanHost)) {
         throw new HTTPException(400, {
-            res: new Response("Host query string do not match or undefined."),
+            res: new Response("Host query string do not match or undefined. Expected format: rr---.googlevideo.com"),
         });
     }
 
@@ -106,7 +107,7 @@ videoPlaybackProxy.get("/", async (c) => {
     const fetchClient = await getFetchClient(config);
 
     let headResponse: Response | undefined;
-    let location = `https://${host}/videoplayback?${queryParams.toString()}`;
+    let location = `https://${cleanHost}/videoplayback?${queryParams.toString()}`;
 
     // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-p2-semantics-17#section-7.3
     // A maximum of 5 redirections is defined in the note of the section 7.3
@@ -145,8 +146,11 @@ videoPlaybackProxy.get("/", async (c) => {
         body: new Uint8Array([0x78, 0]), // protobuf: { 15: 0 } (no idea what it means but this is what YouTube uses),
         headers: headersToSend,
     });
-    if (postResponse.status !== 200) {
-        throw new Error("Non-200 response from google servers");
+    if (postResponse.status !== 200 && postResponse.status !== 206) {
+        return new Response(postResponse.body, {
+            status: postResponse.status,
+            statusText: postResponse.statusText,
+        });
     }
 
     const headersForResponse: Record<string, string> = {
