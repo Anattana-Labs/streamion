@@ -15,7 +15,7 @@ FROM denoland/deno:bin-2.9.7 AS deno-bin
 # Stage 3: Runtime
 FROM debian:12-slim AS runner
 
-EXPOSE 25028 8080
+EXPOSE 25023 8080
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     bash \
@@ -42,7 +42,7 @@ COPY config ./config
 COPY src ./src
 
 # Environment variables
-ENV PORT=25028
+ENV PORT=25023
 ENV HOST="0.0.0.0"
 ENV SOCKS_PORT=1080
 ENV WIREGUARD_INTERFACE_DNS="1.1.1.1"

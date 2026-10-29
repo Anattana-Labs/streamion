@@ -5,7 +5,7 @@
 #####
 
 [server]
-port = 25028                        # env: PORT
+port = 25023                        # env: PORT
 host = "0.0.0.0"                   # env: HOST
 secret_key = "0123456789abcdef"    # env: SERVER_SECRET_KEY
 

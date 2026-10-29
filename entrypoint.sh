@@ -4,7 +4,7 @@ set -e
 echo "[ENTRYPOINT] Starting Streamion with Cloudflare WARP SOCKS5 Proxy"
 
 export HOST="${HOST:-0.0.0.0}"
-export PORT="${PORT:-25028}"
+export PORT="${PORT:-25023}"
 export SOCKS_PORT="${SOCKS_PORT:-1080}"
 export WIREGUARD_INTERFACE_DNS="${WIREGUARD_INTERFACE_DNS:-1.1.1.1}"
 export DENO_DIR="${DENO_DIR:-/tmp/deno_cache}"
