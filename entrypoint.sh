@@ -3,8 +3,19 @@ set -e
 
 echo "[ENTRYPOINT] Starting Streamion with Cloudflare WARP SOCKS5 Proxy"
 
+if [[ "$1" =~ ^[0-9]+$ ]]; then
+    export PORT="$1"
+    shift
+elif [[ "$1" == "--port" || "$1" == "-p" ]] && [[ "$2" =~ ^[0-9]+$ ]]; then
+    export PORT="$2"
+    shift 2
+elif [[ "$1" =~ ^--port=([0-9]+)$ ]]; then
+    export PORT="${BASH_REMATCH[1]}"
+    shift
+fi
+
 export HOST="${HOST:-0.0.0.0}"
-export PORT="${PORT:-25023}"
+export PORT="${PORT:-7860}"
 export SOCKS_PORT="${SOCKS_PORT:-1080}"
 export WIREGUARD_INTERFACE_DNS="${WIREGUARD_INTERFACE_DNS:-1.1.1.1}"
 export DENO_DIR="${DENO_DIR:-/tmp/deno_cache}"
