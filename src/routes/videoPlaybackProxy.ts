@@ -103,102 +103,66 @@ videoPlaybackProxy.get("/", async (c) => {
     }
 
     const fetchClient = await getFetchClient(config);
+    const location = `https://${cleanHost}/videoplayback?${queryParams.toString()}`;
 
-    let headResponse: Response | undefined;
-    let location = `https://${cleanHost}/videoplayback?${queryParams.toString()}`;
+    try {
+        const isUmp = config?.networking?.videoplayback?.ump ?? false;
+        const fetchMethod = isUmp ? "POST" : "GET";
+        const fetchBody = isUmp ? new Uint8Array([0x78, 0]) : undefined;
+        if (isUmp) {
+            headersToSend["content-type"] = "application/x-protobuf";
+            headersToSend["content-length"] = "2";
+        }
+        if (requestBytes) {
+            headersToSend["range"] = `bytes=${requestBytes}`;
+        }
 
-    // https://datatracker.ietf.org/doc/html/draft-ietf-httpbis-p2-semantics-17#section-7.3
-    // A maximum of 5 redirections is defined in the note of the section 7.3
-    // of this RFC, that's why `i < 5`
-    for (let i = 0; i < 5; i++) {
-        const googlevideoResponse: Response = await fetchClient(location, {
-            method: "HEAD",
+        const videoResponse: Response = await fetchClient(location, {
+            method: fetchMethod,
+            body: fetchBody,
             headers: headersToSend,
-            redirect: "manual",
+            redirect: "follow",
         });
-        if (googlevideoResponse.status == 403) {
-            return new Response(googlevideoResponse.body, {
-                status: googlevideoResponse.status,
-                statusText: googlevideoResponse.statusText,
-            });
-        }
-        if (googlevideoResponse.headers.has("Location")) {
-            location = googlevideoResponse.headers.get("Location") as string;
-            continue;
-        } else {
-            headResponse = googlevideoResponse;
-            break;
-        }
-    }
-    if (headResponse === undefined) {
-        throw new HTTPException(502, {
-            res: new Response(
-                "Google headResponse redirected too many times",
-            ),
-        });
-    }
 
-    const googleVideoUrl = new URL(location);
-    const postResponse = await fetchClient(googleVideoUrl, {
-        method: "POST",
-        body: new Uint8Array([0x78, 0]), // protobuf: { 15: 0 } (no idea what it means but this is what YouTube uses),
-        headers: headersToSend,
-    });
-    if (postResponse.status !== 200 && postResponse.status !== 206) {
-        return new Response(postResponse.body, {
-            status: postResponse.status,
-            statusText: postResponse.statusText,
-        });
-    }
+        const headersForResponse = new Headers();
+        headersForResponse.set("access-control-allow-origin", "*");
 
-    const headersForResponse: Record<string, string> = {
-        "content-length": headResponse.headers.get("content-length") || "",
-        "access-control-allow-origin": "*",
-        "accept-ranges": headResponse.headers.get("accept-ranges") || "",
-        "content-type": headResponse.headers.get("content-type") || "",
-        "expires": headResponse.headers.get("expires") || "",
-        "last-modified": headResponse.headers.get("last-modified") || "",
-    };
-
-    if (title) {
-        headersForResponse["content-disposition"] = `attachment; filename="${
-            encodeURIComponent(title)
-        }"; filename*=UTF-8''${encodeRFC5987ValueChars(title)}`;
-    }
-
-    let responseStatus = headResponse.status;
-    if (requestBytes && responseStatus == 200) {
-        // check for range headers in the forms:
-        // "bytes=0-" get full length from start
-        // "bytes=500-" get full length from 500 bytes in
-        // "bytes=500-1000" get 500 bytes starting from 500
-        if (lastByte) {
-            responseStatus = 206;
-            headersForResponse["content-range"] = `bytes ${requestBytes}/${
-                queryParams.get("clen") || "*"
-            }`;
-        } else {
-            // i.e. "bytes=0-", "bytes=600-"
-            // full size of content is able to be calculated, so a full Content-Range header can be constructed
-            const bytesReceived = headersForResponse["content-length"];
-            // last byte should always be one less than the length
-            const totalContentLength = Number(firstByte) +
-                Number(bytesReceived);
-            const lastByte = totalContentLength - 1;
-            if (firstByte !== "0") {
-                // only part of the total content returned, 206
-                responseStatus = 206;
+        for (const [key, value] of videoResponse.headers.entries()) {
+            if ([
+                "content-type",
+                "content-length",
+                "content-range",
+                "accept-ranges",
+                "expires",
+                "last-modified",
+                "cache-control",
+            ].includes(key.toLowerCase())) {
+                headersForResponse.set(key, value);
             }
-            headersForResponse["content-range"] =
-                `bytes ${firstByte}-${lastByte}/${totalContentLength}`;
         }
-    }
 
-    return new Response(postResponse.body, {
-        status: responseStatus,
-        statusText: headResponse.statusText,
-        headers: headersForResponse,
-    });
+        if (title) {
+            headersForResponse.set(
+                "content-disposition",
+                `attachment; filename="${encodeURIComponent(title)}"; filename*=UTF-8''${encodeRFC5987ValueChars(title)}`,
+            );
+        }
+
+        return new Response(videoResponse.body, {
+            status: videoResponse.status,
+            statusText: videoResponse.statusText,
+            headers: headersForResponse,
+        });
+    } catch (err: any) {
+        console.error("[ERROR] Video playback proxy error:", err);
+        return new Response(
+            `Videoplayback proxy error: ${err?.message || err}`,
+            {
+                status: 502,
+                headers: { "access-control-allow-origin": "*" },
+            },
+        );
+    }
 });
 
 export default videoPlaybackProxy;

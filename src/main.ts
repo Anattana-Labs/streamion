@@ -158,6 +158,15 @@ miscRoutes(app, config, regenerateSession);
 
 app.route("/", companionApp);
 
+app.onError((err, c) => {
+    console.error(`[SERVER ERROR] ${c.req.method} ${c.req.url}:`, err);
+    return c.text(`Internal Server Error: ${err.message}`, 500);
+});
+companionApp.onError((err, c) => {
+    console.error(`[COMPANION ERROR] ${c.req.method} ${c.req.url}:`, err);
+    return c.text(`Internal Server Error: ${err.message}`, 500);
+});
+
 // This cannot be changed since companion restricts the
 // files it can access using deno `--allow-write` argument
 const udsPath = config.server.unix_socket_path;
