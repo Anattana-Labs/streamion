@@ -54,5 +54,5 @@ echo "[ENTRYPOINT] Starting Streamion on ${HOST}:${PORT}..."
 if [ "$#" -gt 0 ]; then
     exec "$@"
 else
-    exec deno task dev
+    exec deno task --no-lock dev
 fi
