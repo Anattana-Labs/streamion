@@ -4,9 +4,11 @@ set -e
 echo "[ENTRYPOINT] Starting Streamion with Cloudflare WARP SOCKS5 Proxy"
 
 export HOST="${HOST:-0.0.0.0}"
-export PORT="${PORT:-7860}"
+export PORT="${PORT:-25028}"
 export SOCKS_PORT="${SOCKS_PORT:-1080}"
 export WIREGUARD_INTERFACE_DNS="${WIREGUARD_INTERFACE_DNS:-1.1.1.1}"
+export DENO_DIR="${DENO_DIR:-/tmp/deno_cache}"
+mkdir -p "${DENO_DIR}"
 
 if [[ -z "${WIREGUARD_INTERFACE_PRIVATE_KEY}" ]]; then
     echo "[ENTRYPOINT] Generating Cloudflare Warp configuration..."
@@ -49,4 +51,8 @@ export HTTPS_PROXY="socks5://127.0.0.1:${SOCKS_PORT}"
 export HTTP_PROXY="socks5://127.0.0.1:${SOCKS_PORT}"
 
 echo "[ENTRYPOINT] Starting Streamion on ${HOST}:${PORT}..."
-exec deno task dev
+if [ "$#" -gt 0 ]; then
+    exec "$@"
+else
+    exec deno task dev
+fi
