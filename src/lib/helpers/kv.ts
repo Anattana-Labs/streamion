@@ -30,7 +30,14 @@ export const getKv = (config: Config): Promise<Deno.Kv> => {
     if (!kvPromise) {
         const cacheDir = `${config.cache.directory}/youtubei.js`;
         kvPromise = Deno.mkdir(cacheDir, { recursive: true })
-            .then(() => Deno.openKv(`${cacheDir}/kv_cache.sqlite3`))
+            .then(async () => {
+                try {
+                    await Deno.chmod(cacheDir, 0o777);
+                } catch {
+                    // Ignore chmod failures if not allowed
+                }
+                return Deno.openKv(`${cacheDir}/kv_cache.sqlite3`);
+            })
             .catch((err) => {
                 console.error(
                     `[WARN] Failed to open the on-disk KV cache at ${cacheDir}/kv_cache.sqlite3, falling back to an in-memory store (cache will not persist across restarts)`,

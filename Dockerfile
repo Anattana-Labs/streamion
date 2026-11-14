@@ -30,7 +30,7 @@ COPY --from=go-builder /server /usr/local/bin/server
 COPY --from=deno-bin /deno /usr/local/bin/deno
 
 # Create cache directory for youtubei.js
-RUN mkdir -p /var/tmp/youtubei.js
+RUN mkdir -p /var/tmp/youtubei.js && chmod 777 /var/tmp/youtubei.js
 
 # Copy app files
 WORKDIR /app

@@ -20,6 +20,9 @@ export SOCKS_PORT="${SOCKS_PORT:-1080}"
 export WIREGUARD_INTERFACE_DNS="${WIREGUARD_INTERFACE_DNS:-1.1.1.1}"
 export DENO_DIR="${DENO_DIR:-/tmp/deno_cache}"
 mkdir -p "${DENO_DIR}"
+chmod 777 "${DENO_DIR}" 2>/dev/null || true
+mkdir -p /var/tmp/youtubei.js 2>/dev/null || true
+chmod 777 /var/tmp/youtubei.js 2>/dev/null || true
 
 if [[ -z "${WIREGUARD_INTERFACE_PRIVATE_KEY}" ]]; then
     echo "[ENTRYPOINT] Generating Cloudflare Warp configuration..."
@@ -65,5 +68,5 @@ echo "[ENTRYPOINT] Starting Streamion on ${HOST}:${PORT}..."
 if [ "$#" -gt 0 ]; then
     exec "$@"
 else
-    exec deno task --no-lock dev
+    exec deno task --no-lock dev -- --port "${PORT}"
 fi

@@ -1,9 +1,48 @@
 import { z, ZodError } from "zod";
 import { parse } from "@std/toml";
+import { parseArgs } from "@std/cli/parse-args";
+
+const getCliPort = (): number | undefined => {
+    try {
+        const args = parseArgs(Deno.args);
+        const p = args.port ?? args.p;
+        if (p !== undefined) {
+            const num = Number(p);
+            if (!isNaN(num) && num > 0) return num;
+        }
+        if (args._ && args._.length > 0) {
+            const first = args._[0];
+            if (typeof first === "number" && first > 0) return first;
+            if (typeof first === "string" && /^\d+$/.test(first)) {
+                const num = Number(first);
+                if (!isNaN(num) && num > 0) return num;
+            }
+        }
+    } catch {
+        // ignore
+    }
+    return undefined;
+};
 
 export const ConfigSchema = z.object({
     server: z.object({
-        port: z.number().default(Number(Deno.env.get("PORT")) || 7860),
+        port: z.preprocess(
+            (val) => {
+                const cliPort = getCliPort();
+                if (cliPort !== undefined) return cliPort;
+                const envPort = Deno.env.get("PORT");
+                if (envPort !== undefined && envPort !== "") {
+                    const parsed = Number(envPort);
+                    if (!isNaN(parsed) && parsed > 0) return parsed;
+                }
+                if (val !== undefined && val !== null && val !== "") {
+                    const parsed = Number(val);
+                    if (!isNaN(parsed) && parsed > 0) return parsed;
+                }
+                return 7860;
+            },
+            z.number().int().positive(),
+        ).default(7860),
         host: z.string().default(Deno.env.get("HOST") || "0.0.0.0"),
         use_unix_socket: z.boolean().default(
             Deno.env.get("SERVER_USE_UNIX_SOCKET") === "true" || false,
