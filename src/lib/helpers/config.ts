@@ -4,18 +4,17 @@ import { parseArgs } from "@std/cli/parse-args";
 
 const getCliPort = (): number | undefined => {
     try {
-        const args = parseArgs(Deno.args);
-        const p = args.port ?? args.p;
-        if (p !== undefined) {
-            const num = Number(p);
-            if (!isNaN(num) && num > 0) return num;
-        }
-        if (args._ && args._.length > 0) {
-            const first = args._[0];
-            if (typeof first === "number" && first > 0) return first;
-            if (typeof first === "string" && /^\d+$/.test(first)) {
-                const num = Number(first);
-                if (!isNaN(num) && num > 0) return num;
+        for (let i = 0; i < Deno.args.length; i++) {
+            const arg = Deno.args[i];
+            if (arg === "--port" || arg === "-p") {
+                const next = Deno.args[i + 1];
+                if (next && /^\d+$/.test(next)) return Number(next);
+            }
+            const match = arg.match(/^--(?:port|p)=(\d+)$/);
+            if (match) return Number(match[1]);
+            if (arg !== "--" && /^\d+$/.test(arg)) {
+                const num = Number(arg);
+                if (num > 0 && num <= 65535) return num;
             }
         }
     } catch {

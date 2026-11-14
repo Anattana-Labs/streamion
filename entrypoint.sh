@@ -3,15 +3,48 @@ set -e
 
 echo "[ENTRYPOINT] Starting Streamion with Cloudflare WARP SOCKS5 Proxy"
 
-if [[ "$1" =~ ^[0-9]+$ ]]; then
-    export PORT="$1"
+if [[ "$1" == *entrypoint* ]]; then
     shift
-elif [[ "$1" == "--port" || "$1" == "-p" ]] && [[ "$2" =~ ^[0-9]+$ ]]; then
-    export PORT="$2"
-    shift 2
-elif [[ "$1" =~ ^--port=([0-9]+)$ ]]; then
-    export PORT="${BASH_REMATCH[1]}"
-    shift
+fi
+
+NEW_ARGS=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --port|-p)
+            if [[ "$2" =~ ^[0-9]+$ ]]; then
+                export PORT="$2"
+                shift 2
+            else
+                shift
+            fi
+            ;;
+        --port=*)
+            export PORT="${1#*=}"
+            shift
+            ;;
+        -p=*)
+            export PORT="${1#*=}"
+            shift
+            ;;
+        [0-9]*)
+            if [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ]; then
+                export PORT="$1"
+                shift
+            else
+                NEW_ARGS+=("$1")
+                shift
+            fi
+            ;;
+        *)
+            NEW_ARGS+=("$1")
+            shift
+            ;;
+    esac
+done
+if [ ${#NEW_ARGS[@]} -gt 0 ]; then
+    set -- "${NEW_ARGS[@]}"
+else
+    set --
 fi
 
 export HOST="${HOST:-0.0.0.0}"
@@ -19,10 +52,11 @@ export PORT="${PORT:-7860}"
 export SOCKS_PORT="${SOCKS_PORT:-1080}"
 export WIREGUARD_INTERFACE_DNS="${WIREGUARD_INTERFACE_DNS:-1.1.1.1}"
 export DENO_DIR="${DENO_DIR:-/tmp/deno_cache}"
-mkdir -p "${DENO_DIR}"
-chmod 777 "${DENO_DIR}" 2>/dev/null || true
+mkdir -p "${DENO_DIR}" 2>/dev/null || true
+chmod -R 777 "${DENO_DIR}" 2>/dev/null || true
 mkdir -p /var/tmp/youtubei.js 2>/dev/null || true
-chmod 777 /var/tmp/youtubei.js 2>/dev/null || true
+chmod -R 777 /var/tmp/youtubei.js 2>/dev/null || true
+chmod 666 /var/tmp/youtubei.js/* 2>/dev/null || true
 
 if [[ -z "${WIREGUARD_INTERFACE_PRIVATE_KEY}" ]]; then
     echo "[ENTRYPOINT] Generating Cloudflare Warp configuration..."
@@ -68,5 +102,5 @@ echo "[ENTRYPOINT] Starting Streamion on ${HOST}:${PORT}..."
 if [ "$#" -gt 0 ]; then
     exec "$@"
 else
-    exec deno task --no-lock dev -- --port "${PORT}"
+    exec deno task --no-lock dev "${PORT}"
 fi
